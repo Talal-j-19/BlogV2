@@ -45,6 +45,10 @@ def convert_to_markdown(blog_data: Dict[str, Any], output_dir: str = "output") -
     # Add title as H1
     markdown_content += f"# {blog_data.get('title', '')}\n\n"
     
+    # Add featured image if exists
+    if 'featured_image' in blog_data and blog_data['featured_image'].get('url'):
+        markdown_content += f"![{blog_data['featured_image'].get('alt_text', 'Featured image')}]({blog_data['featured_image']['url']})\n\n"
+    
     # Add introduction
     if 'content' in blog_data and 'introduction' in blog_data['content']:
         markdown_content += f"{blog_data['content']['introduction']}\n\n"
@@ -53,6 +57,11 @@ def convert_to_markdown(blog_data: Dict[str, Any], output_dir: str = "output") -
     if 'content' in blog_data and 'sections' in blog_data['content']:
         for section in blog_data['content']['sections']:
             markdown_content += f"## {section.get('heading', '')}\n\n"
+            
+            # Add section image if exists
+            if 'image' in section and section['image'].get('url'):
+                markdown_content += f"![{section['image'].get('alt_text', section.get('heading', 'Image'))}]({section['image']['url']})\n\n"
+            
             # Check if content is a list or plain text
             if isinstance(section.get('content'), list):
                 for item in section['content']:

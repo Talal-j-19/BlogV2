@@ -1,14 +1,71 @@
 import os
 import json
 import datetime
+import base64
+import requests
+from pathlib import Path
+from typing import Dict, Any, List, Optional
 import google.generativeai as genai
-from typing import Dict, Any
 from dotenv import load_dotenv
+from urllib.parse import quote
 
 # Load environment variables from .env file
 load_dotenv()
 
-def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None) -> Dict[str, Any]:
+def generate_image(prompt: str, output_dir: str = "output/images") -> Optional[Dict[str, str]]:
+    """
+    Generate an image using Pollinations.AI image generation API.
+    
+    Args:
+        prompt (str): Description of the image to generate
+        output_dir (str): Directory to save the generated image
+        
+    Returns:
+        Optional[Dict[str, str]]: Dictionary containing image path and alt text, or None if failed
+    """
+    try:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Prepare the API URL and parameters
+        base_url = "https://image.pollinations.ai/prompt/"
+        url = base_url + quote(f"{prompt}, high quality, 4k, photorealistic")
+        params = {
+            "model": "flux",
+            "width": 1024,
+            "height": 576,  # 16:9 aspect ratio for blog images
+            "nologo": "true"
+        }
+        
+        # Generate the image
+        response = requests.get(url, params=params, stream=True)
+        
+        if response.status_code != 200:
+            print(f"Failed to generate image: {response.status_code} - {response.text}")
+            return None
+        
+        # Generate a filename based on the prompt
+        safe_prompt = "".join(c if c.isalnum() else "_" for c in prompt.lower()[:50])
+        filename = f"{safe_prompt}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+        image_path = os.path.join(output_dir, filename)
+        
+        # Save the image
+        with open(image_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        print(f"✅ Generated image: {filename}")
+        return {
+            "path": image_path,
+            "alt_text": prompt,
+            "filename": filename
+        }
+        
+    except Exception as e:
+        print(f"Error generating image: {str(e)}")
+        return None
+
+def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None, generate_images: bool = True) -> Dict[str, Any]:
     """
     Generate a blog post using Gemini 2.5 Pro model.
     
@@ -16,6 +73,7 @@ def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None
         topic (str): The topic for the blog post
         author (str, optional): Author name. Defaults to "Admin".
         api_key (str, optional): Google AI API key. If not provided, will try to load from .env.
+        generate_images (bool, optional): Whether to generate images. Defaults to True.
         
     Returns:
         Dict[str, Any]: Generated blog content in a structured format
@@ -31,6 +89,9 @@ def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None
     # Configure the Gemini API
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-2.5-pro')
+    
+    # Configure image generation model
+    image_model = genai.GenerativeModel('gemini-2.5-pro-vision')
     
     # Create the prompt
     prompt = f"""You are an expert content writer and SEO specialist. Generate a comprehensive, well-researched, and engaging blog post about {topic} that is optimized for search engines. 
@@ -97,9 +158,33 @@ Topic: {topic}"""
             content = content.split('```json')[1].split('```')[0].strip()
         elif '```' in content:
             content = content.split('```')[1].strip()
-            
+        
         # Parse the JSON response
         blog_data = json.loads(content)
+        
+        # Generate images if enabled
+        if generate_images:
+            # Generate featured image
+            featured_image_prompt = f"A high-quality featured image for a blog post about {topic}"
+            featured_image = generate_image(featured_image_prompt)
+            if featured_image:
+                blog_data['featured_image'] = {
+                    'url': f"images/{featured_image['filename']}",
+                    'alt_text': f"Featured image for {blog_data.get('title', topic)}"
+                }
+            
+            # Generate images for sections
+            if 'content' in blog_data and 'sections' in blog_data['content']:
+                for i, section in enumerate(blog_data['content']['sections']):
+                    if 'heading' in section:
+                        image_prompt = f"A high-quality image for a blog section about {section['heading']} in the context of {topic}"
+                        section_image = generate_image(image_prompt)
+                        if section_image:
+                            section['image'] = {
+                                'url': f"images/{section_image['filename']}",
+                                'alt_text': f"Image showing {section['heading']}"
+                            }
+        
         return blog_data
         
     except Exception as e:

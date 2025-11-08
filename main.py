@@ -18,6 +18,7 @@ def save_blog_to_file(blog_data: dict, output_dir: str = "output") -> str:
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
+    ensure_images_dir()  # Ensure images directory exists
     
     # Create a filename from the blog title
     safe_title = "".join(c if c.isalnum() else "_" for c in blog_data.get('title', 'blog_post'))
@@ -30,16 +31,30 @@ def save_blog_to_file(blog_data: dict, output_dir: str = "output") -> str:
     
     return filepath
 
+def ensure_images_dir():
+    """Ensure the images directory exists."""
+    images_dir = os.path.join("output", "images")
+    os.makedirs(images_dir, exist_ok=True)
+    return images_dir
+
 def generate_blog():
     """Generate a new blog post and convert it to markdown."""
     try:
         # Get blog topic from user
         topic = input("Enter the blog topic: ")
         author = input("Enter author name (or press Enter for default): ").strip() or "Admin"
+        generate_images = input("Generate images? (y/n, default: y): ").strip().lower() != 'n'
+        
+        # Ensure images directory exists
+        if generate_images:
+            ensure_images_dir()
         
         # Generate blog content
         print(f"\nGenerating blog post about: {topic}")
-        blog_content = generate_blog_content(topic, author)
+        if generate_images:
+            print("Image generation is enabled. This may take a few minutes...")
+        
+        blog_content = generate_blog_content(topic, author, generate_images=generate_images)
         
         # Save JSON file
         json_path = save_blog_to_file(blog_content)
