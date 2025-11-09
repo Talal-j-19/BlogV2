@@ -65,15 +65,17 @@ def generate_image(prompt: str, output_dir: str = "output/images") -> Optional[D
         print(f"Error generating image: {str(e)}")
         return None
 
-def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None, generate_images: bool = True) -> Dict[str, Any]:
+def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None, 
+                       generate_images: bool = True, keyword_data: dict = None) -> Dict[str, Any]:
     """
-    Generate a blog post using Gemini 2.5 Pro model.
+    Generate a blog post using Gemini 2.5 Pro model with SEO optimization.
     
     Args:
         topic (str): The topic for the blog post
         author (str, optional): Author name. Defaults to "Admin".
         api_key (str, optional): Google AI API key. If not provided, will try to load from .env.
         generate_images (bool, optional): Whether to generate images. Defaults to True.
+        keyword_data (dict, optional): Dictionary containing keyword research data.
         
     Returns:
         Dict[str, Any]: Generated blog content in a structured format
@@ -84,71 +86,69 @@ def generate_blog_content(topic: str, author: str = "Admin", api_key: str = None
     # Get API key from parameter or environment variable
     api_key = api_key or os.getenv('GEMINI_API_KEY')
     if not api_key:
-        raise ValueError("API key not found. Please set GEMINI_API_KEY in your .env file or pass it as an argument.")
-        
-    # Configure the Gemini API
+        raise ValueError("GEMINI_API_KEY not found in environment variables")
+    
+    # Configure Gemini
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-2.5-pro')
+    
+    # Prepare SEO elements based on keyword research
+    seo_keyword = keyword_data.get('keyword', topic) if keyword_data else topic
+    seo_meta = f"""
+    I'm writing a blog post about '{seo_keyword}'. 
+    Please help me create SEO-optimized content that will rank well in search engines.
+    
+    SEO Requirements:
+    - Primary keyword: {seo_keyword}
+    - Secondary keywords: {', '.join(keyword_data.get('related_keywords', [])) if keyword_data and 'related_keywords' in keyword_data else 'N/A'}
+    - Target audience: People searching for information about {seo_keyword}
+    - Content should be informative, engaging, and well-structured
+    - Include the primary keyword in the first paragraph
+    - Use H2 and H3 headings appropriately
+    - Write in a natural, conversational tone
+    
+    Please generate a comprehensive blog post with the following structure:
+    1. An engaging introduction that includes the primary keyword
+    2. Main content sections with H2 headings
+    3. Sub-sections with H3 headings where appropriate
+    4. A conclusion that summarizes the key points
+    5. A FAQ section with 3-5 common questions and answers
+    
+    Make sure to:
+    - Use the primary keyword in the first 100 words
+    - Include variations of the keyword naturally
+    - Write for humans first, search engines second
+    - Keep paragraphs short and scannable
+    - Use bullet points and numbered lists where appropriate
+    - End with a call-to-action
+    
+    Here's the topic: {topic}
+    """
     
     # Configure image generation model
     image_model = genai.GenerativeModel('gemini-2.5-pro-vision')
     
     # Create the prompt
-    prompt = f"""You are an expert content writer and SEO specialist. Generate a comprehensive, well-researched, and engaging blog post about {topic} that is optimized for search engines. 
-
-Output the content as a JSON object with the following structure:
-{{
-  "title": "A compelling, SEO-optimized title under 60 characters",
-  "meta_description": "A meta description under 160 characters that includes primary keywords",
-  "slug": "seo-friendly-url-slug-based-on-title",
-  "publication_date": "{datetime.datetime.now().strftime('%Y-%m-%d')}",
-  "author": "{author}",
-  "categories": ["Gaming", "Entertainment"],
-  "tags": ["video games", "gaming", "2025 games", "new releases", "gaming news"],
-  "content": {{
-    "introduction": "Engaging introduction that hooks the reader and includes primary keywords naturally. Keep it under 150 words.",
-    "sections": [
-      {{
-        "heading": "H2 heading with focus keyword",
-        "content": "Well-structured paragraph with related keywords and internal/external links where relevant."
-      }}
-    ],
-    "faq": [
-      {{
-        "question": "Common question about the topic",
-        "answer": "Detailed, helpful answer (2-3 sentences)."
-      }},
-      {{
-        "question": "Another common question",
-        "answer": "Clear and informative response."
-      }}
-    ],
-    "conclusion": "Summarize key points and include a clear call-to-action. Keep it under 150 words."
-  }},
-  "seo": {{
-    "focus_keyword": "primary keyword",
-    "secondary_keywords": ["keyword 2", "keyword 3"],
-    "word_count": "Aim for 1200-1800 words",
-    "readability": "Ensure content is easily scannable with short paragraphs and subheadings"
-  }}
-}}
-
-Additional Guidelines:
-1. Include 3-5 relevant FAQs that address common user queries about the topic
-2. Structure FAQs with clear, concise questions and detailed answers
-3. Use natural language that matches how people would ask these questions
-4. Include relevant keywords in the FAQ section where appropriate
-5. Ensure FAQs provide genuine value and address potential concerns
-6. Make sure the content is well-structured with proper heading hierarchy (H1, H2, H3)
-7. Include relevant keywords naturally throughout the content
-8. Add internal/external links to authoritative sources where applicable
-9. Ensure the content is mobile-friendly and easy to read
-10. Include at least one data point or statistic from a credible source
-
-Topic: {topic}"""
-
+    prompt = f"""
+    {seo_meta}
+    
+    Format the response as a JSON object with these fields:
+    - title: The blog post title (include the primary keyword: {seo_keyword})
+    - meta_description: A compelling meta description under 160 characters with the primary keyword
+    - slug: A URL-friendly version of the title
+    - content: An object containing:
+        - introduction: The opening paragraph that includes the primary keyword
+        - sections: An array of sections, each with:
+            - heading: The section heading (H2)
+            - content: The section content (can be a string or array of strings)
+        - conclusion: A summary or closing thoughts that reinforces the main points
+        - faq: An array of 3-5 frequently asked questions with answers
+    
+    Make sure to naturally include the primary keyword and its variations throughout the content.
+    """
+    
     try:
-        # Generate content
+        # Generate blog content with SEO optimization
         response = model.generate_content(prompt)
         
         # Extract JSON from the response

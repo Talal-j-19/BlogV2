@@ -4,6 +4,7 @@ import sys
 from datetime import datetime
 from blog_generator import generate_blog_content
 from markdown_converter import convert_to_markdown
+from keyword_researcher import get_keyword_researcher
 
 def save_blog_to_file(blog_data: dict, output_dir: str = "output") -> str:
     """
@@ -44,17 +45,34 @@ def generate_blog():
         topic = input("Enter the blog topic: ")
         author = input("Enter author name (or press Enter for default): ").strip() or "Admin"
         generate_images = input("Generate images? (y/n, default: y): ").strip().lower() != 'n'
+        use_keyword_research = input("Find low competition keywords? (y/n, default: y): ").strip().lower() != 'n'
         
         # Ensure images directory exists
         if generate_images:
             ensure_images_dir()
+        
+        # Initialize keyword researcher if enabled
+        keyword_data = None
+        if use_keyword_research:
+            researcher = get_keyword_researcher()
+            if researcher:
+                keyword_data = researcher.find_best_keyword(topic)
+                if keyword_data:
+                    topic = keyword_data['keyword']  # Update topic with optimized keyword
+                    print(f"Using optimized keyword: {topic}")
         
         # Generate blog content
         print(f"\nGenerating blog post about: {topic}")
         if generate_images:
             print("Image generation is enabled. This may take a few minutes...")
         
-        blog_content = generate_blog_content(topic, author, generate_images=generate_images)
+        # Pass keyword data to the blog generator for SEO optimization
+        blog_content = generate_blog_content(
+            topic, 
+            author, 
+            generate_images=generate_images,
+            keyword_data=keyword_data
+        )
         
         # Save JSON file
         json_path = save_blog_to_file(blog_content)
