@@ -4,7 +4,8 @@ import time
 
 def test_generate_blog():
     """Test the blog generation endpoint"""
-    url = "http://localhost:8000/api/v1/generate"
+    # url = "http://localhost:8000/api/v1/generate"
+    url = "http://161.35.235.101:8001/api/v1/generate"
     
     # Test data
     payload = {
@@ -45,7 +46,7 @@ def test_generate_blog():
 
 def test_list_blogs():
     """Test the blog listing endpoint"""
-    url = "http://localhost:8000/api/v1/list"
+    url = "http://161.35.235.101:8001/api/v1/generate"
     
     print("\n📋 Listing all generated blogs...")
     try:
